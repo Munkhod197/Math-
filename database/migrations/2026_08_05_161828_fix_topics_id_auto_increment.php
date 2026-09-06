@@ -1,5 +1,3 @@
-<?php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -9,27 +7,23 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. Foreign key байгаа эсэхийг шалгаад устгана
-        $foreignKey = DB::selectOne("
-            SELECT CONSTRAINT_NAME
-            FROM information_schema.KEY_COLUMN_USAGE
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'questions'
-              AND COLUMN_NAME = 'topic_id'
-              AND REFERENCED_TABLE_NAME IS NOT NULL
-            LIMIT 1
-        ");
+        // 1. topics болон questions хүснэгтүүдийн холбоосыг зөв болгохын тулд
+        // Хэрэв table бүтцэд өөрчлөлт орох гэж байгаа бол foreign key-г аюулгүйгээр устгана
+        Schema::table('questions', function (Blueprint $table) {
+            // Хэрэв constraint байгаа бол drop хийх
+            try {
+                $table->dropForeign(['topic_id']);
+            } catch (\Exception $e) {
+                // байхгүй бол алдааг алгасна
+            }
+        });
 
-        if ($foreignKey) {
-            Schema::table('questions', function (Blueprint $table) use ($foreignKey) {
-                $table->dropForeign($foreignKey->CONSTRAINT_NAME);
-            });
-        }
+        // 2. topic_id болон topics.id төрлийг бүрэн тааруулах
+        Schema::table('questions', function (Blueprint $table) {
+            $table->unsignedBigInteger('topic_id')->change();
+        });
 
-        // 2. topic_id-г topics.id-тай ижил төрөл болгоно
-        DB::statement('ALTER TABLE questions MODIFY topic_id BIGINT UNSIGNED NOT NULL');
-
-        // 3. Foreign key-г дахин нэмнэ
+        // 3. Foreign key-г дахин холбох
         Schema::table('questions', function (Blueprint $table) {
             $table->foreign('topic_id')
                   ->references('id')
